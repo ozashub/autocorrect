@@ -63,7 +63,6 @@ class Corrector:
         self._buf: list[str] = []
         self._hooked = False
         self._last_fix = None
-        self._trail = ""
 
         if cache_path.exists():
             self._spell.load_pickle(str(cache_path))
@@ -133,28 +132,25 @@ class Corrector:
 
         threading.Thread(target=go, daemon=True).start()
 
-    def _commit(self, trigger):
+    def _commit(self, suffix):
         if not self._buf:
             return
         raw = "".join(self._buf)
         fix = self._lookup(raw)
         if fix and fix != raw:
-            suffix = {"enter": "\n", "tab": "\t"}.get(trigger, " ")
-            self._inject(len(raw) + 1, fix + self._trail + suffix)
-            self._last_fix = (raw, fix, time.monotonic(), trigger)
+            self._inject(len(raw) + 1, fix + suffix)
+            self._last_fix = (raw, fix, time.monotonic())
         self._buf.clear()
-        self._trail = ""
 
     def _undo(self):
         if not self._last_fix:
             return False
-        orig, corrected, ts, trigger = self._last_fix
-        if time.monotonic() - ts > 3.0:
+        orig, corrected, ts = self._last_fix
+        if time.monotonic() - ts > 1.5:
             self._last_fix = None
             return False
         self._last_fix = None
-        suffix = {"enter": "\n", "tab": "\t"}.get(trigger, " ")
-        self._inject(len(corrected), orig + suffix)
+        self._inject(len(corrected), orig + " ")
         return True
 
     def __call__(self, event):
@@ -164,31 +160,28 @@ class Corrector:
         k = event.name
 
         if len(k) == 1 and (k.isalpha() or k == "'"):
-            if self._last_fix:
-                self._last_fix = None
+            self._last_fix = None
             self._buf.append(k)
             return
 
         if len(k) == 1 and k in WORD_BREAKS:
-            self._trail += k
-            return
-
-        if k in ("space", "enter", "tab"):
             self._commit(k)
             return
 
+        if k in ("space", "enter", "tab"):
+            suffix = {"enter": "\n", "tab": "\t"}.get(k, " ")
+            self._commit(suffix)
+            return
+
         if k == "backspace":
-            if self._trail:
-                self._trail = self._trail[:-1]
-            elif not self._buf and self._last_fix:
+            if not self._buf and self._last_fix:
                 self._undo()
                 return
-            elif self._buf:
+            if self._buf:
                 self._buf.pop()
             return
 
         self._buf.clear()
-        self._trail = ""
         self._last_fix = None
 
     def run(self):
