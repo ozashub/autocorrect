@@ -120,7 +120,6 @@ class Corrector:
 
         def go():
             try:
-                time.sleep(0.02)
                 for _ in range(n_bs):
                     keyboard.send("backspace")
                 for ch in text:
