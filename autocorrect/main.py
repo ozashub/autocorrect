@@ -21,7 +21,7 @@ from pathlib import Path
 from symspellpy.symspellpy import SymSpell, Verbosity
 
 
-_FREQ_RATIO = 1000  # second suggestion wins only if it's way more common
+_FREQ_RATIO = 1000
 
 _GRAMMAR = {
     "aint": "ain't",    "arent": "aren't",  "cant": "can't",
@@ -85,7 +85,6 @@ class Corrector:
         return None
 
     def _apply(self, corrected: str):
-        # nuke the word mid-type and drop the fix in its place
         self._swapping = True
         keyboard.send("backspace")
         keyboard.send("ctrl+backspace")
