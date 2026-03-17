@@ -307,18 +307,27 @@ class Corrector:
 
         return self._transfer_case(word, best.term)
 
+    def _type_text(self, text: str):
+        for ch in text:
+            try:
+                keyboard.write(ch)
+            except Exception:
+                pass
+
     def _send_fix(self, original: str, corrected: str, trigger: str):
         self._swapping = True
 
         def _do():
-            time.sleep(0.02)
-            for _ in range(len(original) + 1):
-                keyboard.send("backspace")
-            suffix = {"enter": "\n", "tab": "\t"}.get(trigger, " ")
-            keyboard.write(corrected + suffix)
-            self._last_fix = (original, corrected, time.monotonic(), trigger)
-            time.sleep(0.05)
-            self._swapping = False
+            try:
+                time.sleep(0.02)
+                for _ in range(len(original) + 1):
+                    keyboard.send("backspace")
+                suffix = {"enter": "\n", "tab": "\t"}.get(trigger, " ")
+                self._type_text(corrected + suffix)
+                self._last_fix = (original, corrected, time.monotonic(), trigger)
+            finally:
+                time.sleep(0.05)
+                self._swapping = False
 
         threading.Thread(target=_do, daemon=True).start()
 
@@ -334,12 +343,14 @@ class Corrector:
         self._last_fix = None
 
         def _do():
-            time.sleep(0.02)
-            for _ in range(len(corrected)):
-                keyboard.send("backspace")
-            keyboard.write(orig)
-            time.sleep(0.05)
-            self._swapping = False
+            try:
+                time.sleep(0.02)
+                for _ in range(len(corrected)):
+                    keyboard.send("backspace")
+                self._type_text(orig)
+            finally:
+                time.sleep(0.05)
+                self._swapping = False
 
         threading.Thread(target=_do, daemon=True).start()
 
