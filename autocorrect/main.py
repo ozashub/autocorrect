@@ -151,51 +151,39 @@ class Corrector:
             return None
 
         max_dist = 1 if len(word) <= 5 else 2
-        hits = self._spell.lookup(word, Verbosity.CLOSEST, max_edit_distance=max_dist)
+
+        # ALL not CLOSEST — junk low-freq entries at distance 0 would hide real matches
+        hits = self._spell.lookup(word, Verbosity.ALL, max_edit_distance=max_dist)
         if not hits:
             return None
 
-        # only consider real words
-        hits = [h for h in hits if h.distance > 0 and h.count >= self.MIN_FREQ]
-        if not hits:
-            return None
-
-        best = None
+        candidates = []
         for h in hits:
-            t, c = low, h.term.lower()
-
-            # distance-2 must share first letter
-            if h.distance == 2 and t[0] != c[0]:
+            if h.distance == 0:
                 continue
-
-            # for short words, be strict: first letter must match
-            if len(word) <= 4 and t[0] != c[0]:
+            if h.count < self.MIN_FREQ:
                 continue
+            c = h.term.lower()
+            if h.distance == 2 and low[0] != c[0]:
+                continue
+            if len(word) <= 4 and low[0] != c[0]:
+                continue
+            if h.distance == 2 and len(word) <= 6 and not is_swap(low, c):
+                continue
+            candidates.append(h)
 
-            # prefer swaps and fat-fingers — these are real typos
-            swap = is_swap(t, c)
-            fat = is_fat_finger(t, c)
-
-            # pick the best: swaps > fat-fingers > highest frequency
-            if best is None:
-                best = (h, swap, fat)
-            elif swap and not best[1]:
-                best = (h, swap, fat)
-            elif fat and not best[1] and not best[2]:
-                best = (h, swap, fat)
-            elif not best[1] and not best[2] and h.count > best[0].count:
-                best = (h, swap, fat)
-
-        if not best:
+        if not candidates:
             return None
 
-        h, swap, fat = best
+        # swaps and fat-fingers float to the top, then sort by frequency
+        def rank(h):
+            c = h.term.lower()
+            swap = is_swap(low, c)
+            fat = is_fat_finger(low, c)
+            return (swap, fat, h.count)
 
-        # for distance-2 on shortish words, only allow if it's an obvious typo
-        if h.distance == 2 and len(word) <= 6 and not swap:
-            return None
-
-        return self._transfer_case(word, h.term)
+        candidates.sort(key=rank, reverse=True)
+        return self._transfer_case(word, candidates[0].term)
 
     def _inject(self, n_backspace, text):
         keyboard.unhook(self)
