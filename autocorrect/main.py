@@ -10,8 +10,7 @@ def _bootstrap():
                if importlib.util.find_spec(mod) is None]
     if missing:
         subprocess.check_call([sys.executable, "-m", "pip", "install", *missing])
-        subprocess.Popen([sys.executable, os.path.abspath(sys.argv[0])] + sys.argv[1:])
-        sys.exit(0)
+        os.execv(sys.executable, [sys.executable, os.path.abspath(sys.argv[0])] + sys.argv[1:])
 
 
 _bootstrap()
