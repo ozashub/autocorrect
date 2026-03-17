@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import importlib.util
-import json
 import os
 import subprocess
 import sys
@@ -24,8 +23,32 @@ from symspellpy.symspellpy import SymSpell, Verbosity
 
 _FREQ_RATIO = 1000  # second suggestion wins only if it's way more common
 
-_base = Path(__file__).parent
-_GRAMMAR: dict[str, str] = json.loads((_base / "grammar.json").read_text())
+_GRAMMAR = {
+    "aint": "ain't",    "arent": "aren't",  "cant": "can't",
+    "cnat": "can't",    "cmon": "c'mon",    "coudlnt": "couldn't",
+    "coulndt": "couldn't", "coudn": "couldn't", "coudln": "couldn't",
+    "couldnt": "couldn't", "couldve": "could've", "didnt": "didn't",
+    "didint": "didn't", "doesnt": "doesn't", "dosen": "doesn't",
+    "doens": "doesn't", "dosn": "doesn't",  "dont": "don't",
+    "odnt": "don't",    "hadnt": "hadn't",  "hasnt": "hasn't",
+    "havent": "haven't", "hed": "he'd",     "heres": "here's",
+    "hes": "he's",      "howd": "how'd",    "hows": "how's",
+    "i": "I",           "id": "I'd",        "ill": "I'll",
+    "im": "I'm",        "isnt": "isn't",    "itll": "it'll",
+    "ive": "I've",      "mightnt": "mightn't", "mightve": "might've",
+    "mustnt": "mustn't", "oughtnt": "oughtn't", "shant": "shan't",
+    "shes": "she's",    "sholdnt": "shouldn't", "shoudlnt": "shouldn't",
+    "shouldnt": "shouldn't", "shouldent": "shouldn't", "shouldve": "should've",
+    "thats": "that's",  "thtas": "that's",  "thast": "that's",
+    "theres": "there's", "theyd": "they'd", "theyll": "they'll",
+    "theyre": "they're", "theyve": "they've", "tisn": "it's",
+    "wasnt": "wasn't",  "weere": "we're",   "werent": "weren't",
+    "weve": "we've",    "whats": "what's",  "whos": "who's",
+    "whyd": "why'd",    "wont": "won't",    "woudlnt": "wouldn't",
+    "wouldnt": "wouldn't", "wouldve": "would've", "yall": "y'all",
+    "youd": "you'd",    "youll": "you'll",  "youre": "you're",
+    "youve": "you've",  "wed": "we'd",
+}
 
 
 class Corrector:
@@ -90,8 +113,9 @@ class Corrector:
 
 
 if __name__ == "__main__":
+    base = Path(__file__).parent
     Corrector(
-        dict_path=_base / "dict.txt",
-        personal_path=_base / "personal.txt",
-        cache_path=_base / "cache.pkl",
+        dict_path=base / "dict.txt",
+        personal_path=base / "personal.txt",
+        cache_path=base / "cache.pkl",
     ).run()
