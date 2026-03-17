@@ -160,6 +160,7 @@ class Corrector:
         self._skip = False
         self._prev_word = None
         self._last_fix = None
+        self._last_key_at = 0.0
         self._typed = Counter()
         self._rejections = Counter()
         self._suppressed: set[str] = set()
@@ -326,7 +327,6 @@ class Corrector:
                 self._type_text(corrected + suffix)
                 self._last_fix = (original, corrected, time.monotonic(), trigger)
             finally:
-                time.sleep(0.05)
                 self._swapping = False
 
         threading.Thread(target=_do, daemon=True).start()
@@ -349,7 +349,6 @@ class Corrector:
                     keyboard.send("backspace")
                 self._type_text(orig)
             finally:
-                time.sleep(0.05)
                 self._swapping = False
 
         threading.Thread(target=_do, daemon=True).start()
@@ -382,8 +381,13 @@ class Corrector:
             return
 
         k = event.name
+        now = time.monotonic()
 
         if len(k) == 1 and (k.isalpha() or k == "'"):
+            if now - self._last_key_at > 2.0:
+                self._buf.clear()
+                self._skip = False
+            self._last_key_at = now
             if self._last_fix:
                 self._last_fix = None
             self._buf.append(k)
