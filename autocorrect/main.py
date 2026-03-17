@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import importlib.util
+import json
 import os
 import subprocess
 import sys
@@ -23,6 +24,9 @@ from symspellpy.symspellpy import SymSpell, Verbosity
 
 _FREQ_RATIO = 1000  # second suggestion wins only if it's way more common
 
+_base = Path(__file__).parent
+_GRAMMAR: dict[str, str] = json.loads((_base / "grammar.json").read_text())
+
 
 class Corrector:
     def __init__(self, dict_path: Path, personal_path: Path, cache_path: Path):
@@ -43,6 +47,11 @@ class Corrector:
             self._spell.load_dictionary(str(personal_path), 0, 1)
 
     def _lookup(self, word: str) -> str | None:
+        grammar_fix = _GRAMMAR.get(word.lower())
+        if grammar_fix:
+            return grammar_fix
+        if len(word) < 2:
+            return None
         hits = self._spell.lookup(word, Verbosity.ALL, max_edit_distance=2)
         if not hits:
             return None
@@ -67,7 +76,7 @@ class Corrector:
         if len(k) == 1 and k.isalpha():
             self._buf.append(k)
         elif k in ("space", "enter", "tab"):
-            if len(self._buf) > 1:
+            if self._buf:
                 fix = self._lookup("".join(self._buf))
                 if fix:
                     self._apply(fix)
@@ -81,9 +90,8 @@ class Corrector:
 
 
 if __name__ == "__main__":
-    base = Path(__file__).parent
     Corrector(
-        dict_path=base / "dict.txt",
-        personal_path=base / "personal.txt",
-        cache_path=base / "cache.pkl",
+        dict_path=_base / "dict.txt",
+        personal_path=_base / "personal.txt",
+        cache_path=_base / "cache.pkl",
     ).run()
