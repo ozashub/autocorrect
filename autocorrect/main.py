@@ -199,7 +199,7 @@ class Corrector:
             return 1.0
         return max(0.0, 1.0 - (sum(dists) / len(dists)) / 3.2)
 
-    def _pattern_score(self, typed: str, cand: str) -> float:
+    def _pattern_bonus(self, typed: str, cand: str) -> float:
         if len(typed) == len(cand):
             diffs = [i for i in range(len(typed)) if typed[i] != cand[i]]
             if (
@@ -208,17 +208,17 @@ class Corrector:
                 and typed[diffs[0]] == cand[diffs[1]]
                 and typed[diffs[1]] == cand[diffs[0]]
             ):
-                return 0.9
+                return 0.15
 
         if len(typed) == len(cand) + 1:
             for i in range(len(typed) - 1):
                 if typed[i] == typed[i + 1] and typed[:i] + typed[i + 1 :] == cand:
-                    return 0.7
+                    return 0.10
 
         if len(cand) == len(typed) + 1:
             for i in range(len(cand)):
                 if cand[:i] + cand[i + 1 :] == typed:
-                    return 0.7
+                    return 0.10
 
         return 0.0
 
@@ -227,23 +227,21 @@ class Corrector:
         freq = math.log1p(hit.count) / self._max_freq
         dist = 1.0 - hit.distance * 0.25
         kbd = self._kbd_score(t, c)
-        first = 1.0 if t[0] == c[0] else 0.3
+        first = 1.0 if t[0] == c[0] else 0.5
 
         try:
             phon = 1.0 if jellyfish.metaphone(t) == jellyfish.metaphone(c) else 0.0
         except Exception:
             phon = 0.0
 
-        pattern = self._pattern_score(t, c)
-
-        return (
-            0.25 * freq
+        base = (
+            0.35 * freq
             + 0.30 * dist
             + 0.10 * kbd
-            + 0.15 * first
+            + 0.10 * first
             + 0.10 * phon
-            + 0.10 * pattern
         )
+        return base + self._pattern_bonus(t, c)
 
     def _phonetic_fallback(self, word: str) -> str | None:
         low = word.lower()
@@ -276,23 +274,34 @@ class Corrector:
             return None
 
         hits = self._spell.lookup(word, Verbosity.ALL, max_edit_distance=2)
-        if not hits:
-            return self._phonetic_fallback(word)
 
-        if hits[0].distance == 0 and hits[0].count >= 5000:
+        if hits and hits[0].distance == 0 and hits[0].count >= 5000:
             return None
 
+        phon_hit = self._phonetic_fallback(word)
+
         candidates = [(self._score(word, h), h) for h in hits if h.distance > 0]
+
+        if phon_hit:
+            candidates = [
+                (sc + 0.22 if h.term == phon_hit else sc, h)
+                for sc, h in candidates
+            ]
+            found = any(h.term == phon_hit for _, h in candidates)
+            if not found:
+                phon_hits = self._spell.lookup(
+                    phon_hit, Verbosity.CLOSEST, max_edit_distance=0
+                )
+                for ph in phon_hits:
+                    candidates.append((self._score(word, ph) + 0.22, ph))
+
         if not candidates:
             return None
 
         candidates.sort(key=lambda x: x[0], reverse=True)
         best_sc, best = candidates[0]
 
-        if len(candidates) > 1 and best_sc - candidates[1][0] < 0.12:
-            return None
-
-        thresh = 0.82 if len(word) <= 3 else 0.70
+        thresh = 0.70 if len(word) <= 3 else 0.60
         if best_sc < thresh:
             return None
 
