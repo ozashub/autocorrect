@@ -34,122 +34,64 @@ from symspellpy.symspellpy import SymSpell, Verbosity
 
 
 QWERTY = {
-    "q": (0, 0),
-    "w": (1, 0),
-    "e": (2, 0),
-    "r": (3, 0),
-    "t": (4, 0),
-    "y": (5, 0),
-    "u": (6, 0),
-    "i": (7, 0),
-    "o": (8, 0),
-    "p": (9, 0),
-    "a": (0.25, 1),
-    "s": (1.25, 1),
-    "d": (2.25, 1),
-    "f": (3.25, 1),
-    "g": (4.25, 1),
-    "h": (5.25, 1),
-    "j": (6.25, 1),
-    "k": (7.25, 1),
-    "l": (8.25, 1),
-    "z": (0.75, 2),
-    "x": (1.75, 2),
-    "c": (2.75, 2),
-    "v": (3.75, 2),
-    "b": (4.75, 2),
-    "n": (5.75, 2),
-    "m": (6.75, 2),
+    'q': (0, 0), 'w': (1, 0), 'e': (2, 0), 'r': (3, 0), 't': (4, 0),
+    'y': (5, 0), 'u': (6, 0), 'i': (7, 0), 'o': (8, 0), 'p': (9, 0),
+    'a': (0.25, 1), 's': (1.25, 1), 'd': (2.25, 1), 'f': (3.25, 1),
+    'g': (4.25, 1), 'h': (5.25, 1), 'j': (6.25, 1), 'k': (7.25, 1),
+    'l': (8.25, 1),
+    'z': (0.75, 2), 'x': (1.75, 2), 'c': (2.75, 2), 'v': (3.75, 2),
+    'b': (4.75, 2), 'n': (5.75, 2), 'm': (6.75, 2),
 }
 
+MAX_KEY_DIST = 3.2
+
 GRAMMAR = {
-    "aint": "ain't",
-    "arent": "aren't",
-    "cant": "can't",
-    "cnat": "can't",
-    "cmon": "c'mon",
-    "coudlnt": "couldn't",
-    "coulndt": "couldn't",
-    "coudn": "couldn't",
-    "coudln": "couldn't",
-    "couldnt": "couldn't",
-    "couldve": "could've",
-    "didnt": "didn't",
-    "didint": "didn't",
-    "doesnt": "doesn't",
-    "dosen": "doesn't",
-    "doens": "doesn't",
-    "dosn": "doesn't",
-    "dont": "don't",
-    "odnt": "don't",
-    "hadnt": "hadn't",
-    "hasnt": "hasn't",
-    "havent": "haven't",
-    "hed": "he'd",
-    "heres": "here's",
-    "hes": "he's",
-    "howd": "how'd",
-    "hows": "how's",
-    "i": "I",
-    "id": "I'd",
-    "ill": "I'll",
-    "im": "I'm",
-    "isnt": "isn't",
-    "itll": "it'll",
-    "ive": "I've",
-    "mightnt": "mightn't",
-    "mightve": "might've",
-    "mustnt": "mustn't",
-    "oughtnt": "oughtn't",
-    "shant": "shan't",
-    "shes": "she's",
-    "sholdnt": "shouldn't",
-    "shoudlnt": "shouldn't",
-    "shouldnt": "shouldn't",
-    "shouldent": "shouldn't",
-    "shouldve": "should've",
-    "thats": "that's",
-    "thtas": "that's",
-    "thast": "that's",
-    "theres": "there's",
-    "theyd": "they'd",
-    "theyll": "they'll",
-    "theyre": "they're",
-    "theyve": "they've",
-    "tisn": "it's",
-    "wasnt": "wasn't",
-    "weere": "we're",
-    "werent": "weren't",
-    "weve": "we've",
-    "whats": "what's",
-    "whos": "who's",
-    "whyd": "why'd",
-    "wont": "won't",
-    "woudlnt": "wouldn't",
-    "wouldnt": "wouldn't",
-    "wouldve": "would've",
-    "yall": "y'all",
-    "youd": "you'd",
-    "youll": "you'll",
-    "youre": "you're",
-    "youve": "you've",
-    "wed": "we'd",
+    "aint": "ain't", "arent": "aren't", "cant": "can't", "cnat": "can't",
+    "cmon": "c'mon", "coudlnt": "couldn't", "coulndt": "couldn't",
+    "coudn": "couldn't", "coudln": "couldn't", "couldnt": "couldn't",
+    "couldve": "could've", "didnt": "didn't", "didint": "didn't",
+    "doesnt": "doesn't", "dosen": "doesn't", "doens": "doesn't",
+    "dosn": "doesn't", "dont": "don't", "odnt": "don't",
+    "hadnt": "hadn't", "hasnt": "hasn't", "havent": "haven't",
+    "hed": "he'd", "heres": "here's", "hes": "he's", "howd": "how'd",
+    "hows": "how's", "i": "I", "id": "I'd", "ill": "I'll", "im": "I'm",
+    "isnt": "isn't", "itll": "it'll", "ive": "I've",
+    "mightnt": "mightn't", "mightve": "might've", "mustnt": "mustn't",
+    "oughtnt": "oughtn't", "shant": "shan't", "shes": "she's",
+    "sholdnt": "shouldn't", "shoudlnt": "shouldn't",
+    "shouldnt": "shouldn't", "shouldent": "shouldn't",
+    "shouldve": "should've", "thats": "that's", "thtas": "that's",
+    "thast": "that's", "theres": "there's", "theyd": "they'd",
+    "theyll": "they'll", "theyre": "they're", "theyve": "they've",
+    "tisn": "it's", "wasnt": "wasn't", "weere": "we're",
+    "werent": "weren't", "weve": "we've", "whats": "what's",
+    "whos": "who's", "whyd": "why'd", "wont": "won't",
+    "woudlnt": "wouldn't", "wouldnt": "wouldn't", "wouldve": "would've",
+    "yall": "y'all", "youd": "you'd", "youll": "you'll",
+    "youre": "you're", "youve": "you've", "wed": "we'd",
 }
 
 PHONETIC_SWAPS = {
-    "ph": "f",
-    "f": "ph",
-    "k": "c",
-    "c": "k",
-    "kn": "n",
-    "wr": "r",
-    "gn": "n",
-    "gh": "g",
-    "wh": "w",
-    "ck": "k",
-    "ght": "t",
-    "tch": "ch",
+    'ph': 'f', 'f': 'ph', 'k': 'c', 'c': 'k',
+    'kn': 'n', 'wr': 'r', 'gn': 'n', 'gh': 'g',
+    'wh': 'w', 'ck': 'k', 'ght': 't', 'tch': 'ch',
 }
+
+W_FREQ = 0.25
+W_DIST = 0.30
+W_KBD = 0.10
+W_FIRST = 0.15
+W_PHON = 0.10
+W_PATTERN = 0.10
+
+CONF_THRESH = 0.70
+CONF_SHORT = 0.82
+KNOWN_FLOOR = 5000
+AMBIGUITY_GAP = 0.12
+UNDO_WINDOW = 3.0
+LEARN_AFTER = 3
+REJECT_AFTER = 2
+SAVE_EVERY = 50
 
 
 class Corrector:
@@ -187,7 +129,7 @@ class Corrector:
     def _key_dist(self, a: str, b: str) -> float:
         pa, pb = QWERTY.get(a), QWERTY.get(b)
         if not pa or not pb:
-            return 3.2
+            return MAX_KEY_DIST
         return math.hypot(pa[0] - pb[0], pa[1] - pb[1])
 
     def _kbd_score(self, typed: str, cand: str) -> float:
@@ -197,51 +139,48 @@ class Corrector:
                 dists.append(self._key_dist(typed[i], cand[i]))
         if not dists:
             return 1.0
-        return max(0.0, 1.0 - (sum(dists) / len(dists)) / 3.2)
+        return max(0.0, 1.0 - (sum(dists) / len(dists)) / MAX_KEY_DIST)
 
-    def _pattern_bonus(self, typed: str, cand: str) -> float:
+    def _pattern_score(self, typed: str, cand: str) -> float:
+        # transposition: teh -> the
         if len(typed) == len(cand):
             diffs = [i for i in range(len(typed)) if typed[i] != cand[i]]
-            if (
-                len(diffs) == 2
-                and diffs[1] == diffs[0] + 1
-                and typed[diffs[0]] == cand[diffs[1]]
-                and typed[diffs[1]] == cand[diffs[0]]
-            ):
-                return 0.15
+            if (len(diffs) == 2
+                    and diffs[1] == diffs[0] + 1
+                    and typed[diffs[0]] == cand[diffs[1]]
+                    and typed[diffs[1]] == cand[diffs[0]]):
+                return 0.9
 
+        # doubled letter: letterr -> letter
         if len(typed) == len(cand) + 1:
             for i in range(len(typed) - 1):
-                if typed[i] == typed[i + 1] and typed[:i] + typed[i + 1 :] == cand:
-                    return 0.10
+                if typed[i] == typed[i + 1] and typed[:i] + typed[i + 1:] == cand:
+                    return 0.7
 
+        # dropped letter: writng -> writing
         if len(cand) == len(typed) + 1:
             for i in range(len(cand)):
-                if cand[:i] + cand[i + 1 :] == typed:
-                    return 0.10
+                if cand[:i] + cand[i + 1:] == typed:
+                    return 0.7
 
         return 0.0
 
     def _score(self, typed: str, hit) -> float:
         t, c = typed.lower(), hit.term.lower()
         freq = math.log1p(hit.count) / self._max_freq
-        dist = 1.0 - hit.distance * 0.25
+        dist = 1.0 - hit.distance / 2.0
         kbd = self._kbd_score(t, c)
-        first = 1.0 if t[0] == c[0] else 0.5
+        first = 1.0 if t[0] == c[0] else 0.3
 
         try:
             phon = 1.0 if jellyfish.metaphone(t) == jellyfish.metaphone(c) else 0.0
         except Exception:
             phon = 0.0
 
-        base = (
-            0.35 * freq
-            + 0.30 * dist
-            + 0.10 * kbd
-            + 0.10 * first
-            + 0.10 * phon
-        )
-        return base + self._pattern_bonus(t, c)
+        pattern = self._pattern_score(t, c)
+
+        return (W_FREQ * freq + W_DIST * dist + W_KBD * kbd
+                + W_FIRST * first + W_PHON * phon + W_PATTERN * pattern)
 
     def _phonetic_fallback(self, word: str) -> str | None:
         low = word.lower()
@@ -250,7 +189,7 @@ class Corrector:
                 continue
             alt = low.replace(old, new, 1)
             hits = self._spell.lookup(alt, Verbosity.CLOSEST, max_edit_distance=1)
-            if hits and hits[0].distance <= 1 and hits[0].count >= 5000:
+            if hits and hits[0].distance <= 1 and hits[0].count >= KNOWN_FLOOR:
                 return self._transfer_case(word, hits[0].term)
         return None
 
@@ -274,34 +213,24 @@ class Corrector:
             return None
 
         hits = self._spell.lookup(word, Verbosity.ALL, max_edit_distance=2)
+        if not hits:
+            return self._phonetic_fallback(word)
 
-        if hits and hits[0].distance == 0 and hits[0].count >= 5000:
+        # don't touch words that are already correct and common
+        if hits[0].distance == 0 and hits[0].count >= KNOWN_FLOOR:
             return None
 
-        phon_hit = self._phonetic_fallback(word)
-
         candidates = [(self._score(word, h), h) for h in hits if h.distance > 0]
-
-        if phon_hit:
-            candidates = [
-                (sc + 0.22 if h.term == phon_hit else sc, h)
-                for sc, h in candidates
-            ]
-            found = any(h.term == phon_hit for _, h in candidates)
-            if not found:
-                phon_hits = self._spell.lookup(
-                    phon_hit, Verbosity.CLOSEST, max_edit_distance=0
-                )
-                for ph in phon_hits:
-                    candidates.append((self._score(word, ph) + 0.22, ph))
-
         if not candidates:
             return None
 
         candidates.sort(key=lambda x: x[0], reverse=True)
         best_sc, best = candidates[0]
 
-        thresh = 0.70 if len(word) <= 3 else 0.60
+        if len(candidates) > 1 and best_sc - candidates[1][0] < AMBIGUITY_GAP:
+            return None
+
+        thresh = CONF_SHORT if len(word) <= 3 else CONF_THRESH
         if best_sc < thresh:
             return None
 
@@ -320,11 +249,13 @@ class Corrector:
         if not self._last_fix:
             return False
         orig, corrected, ts, _ = self._last_fix
-        if time.monotonic() - ts > 3.0:
+        if time.monotonic() - ts > UNDO_WINDOW:
             self._last_fix = None
             return False
 
         self._swapping = True
+        # the user's pending backspace eats the trailing space,
+        # so just nuke the corrected word and type the original back
         for _ in range(len(corrected)):
             keyboard.send("backspace")
         keyboard.write(orig)
@@ -332,7 +263,7 @@ class Corrector:
 
         key = f"{orig.lower()}->{corrected.lower()}"
         self._rejections[key] += 1
-        if self._rejections[key] >= 2:
+        if self._rejections[key] >= REJECT_AFTER:
             self._suppressed.add(orig.lower())
 
         self._last_fix = None
@@ -344,12 +275,12 @@ class Corrector:
     def _learn(self, word: str):
         low = word.lower()
         self._typed[low] += 1
-        if self._typed[low] < 3 or low in self._learned:
+        if self._typed[low] < LEARN_AFTER or low in self._learned:
             return
         self._learned.add(low)
-        self._spell.create_dictionary_entry(low, 5001)
+        self._spell.create_dictionary_entry(low, KNOWN_FLOOR + 1)
         self._dirty += 1
-        if self._dirty >= 50:
+        if self._dirty >= SAVE_EVERY:
             self._save_personal()
 
     def _save_personal(self):
@@ -384,15 +315,13 @@ class Corrector:
                     self._learn(raw)
                     if self._after_punct and raw[0].islower() and len(raw) > 1:
                         cap = raw[0].upper() + raw[1:]
-                        hits = self._spell.lookup(
-                            cap, Verbosity.CLOSEST, max_edit_distance=0
-                        )
+                        hits = self._spell.lookup(cap, Verbosity.CLOSEST, max_edit_distance=0)
                         if not hits:
                             self._send_fix(raw, cap, k)
                 self._prev_word = (fix or raw).lower()
             self._buf.clear()
             self._skip = False
-            self._after_punct = k == "enter"
+            self._after_punct = (k == "enter")
             return
 
         if k == "backspace":
@@ -411,6 +340,7 @@ class Corrector:
             self._skip = False
             return
 
+        # arrow keys, mouse, modifier combos — cursor moved, bail
         self._buf.clear()
         self._skip = False
         self._last_fix = None
