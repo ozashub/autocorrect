@@ -309,12 +309,18 @@ class Corrector:
 
     def _send_fix(self, original: str, corrected: str, trigger: str):
         self._swapping = True
-        for _ in range(len(original) + 1):
-            keyboard.send("backspace")
-        suffix = {"enter": "\n", "tab": "\t"}.get(trigger, " ")
-        keyboard.write(corrected + suffix)
-        self._last_fix = (original, corrected, time.monotonic(), trigger)
-        threading.Timer(0.15, self._unlock).start()
+
+        def _do():
+            time.sleep(0.02)
+            for _ in range(len(original) + 1):
+                keyboard.send("backspace")
+            suffix = {"enter": "\n", "tab": "\t"}.get(trigger, " ")
+            keyboard.write(corrected + suffix)
+            self._last_fix = (original, corrected, time.monotonic(), trigger)
+            time.sleep(0.05)
+            self._swapping = False
+
+        threading.Thread(target=_do, daemon=True).start()
 
     def _undo(self) -> bool:
         if not self._last_fix:
@@ -325,21 +331,24 @@ class Corrector:
             return False
 
         self._swapping = True
-        for _ in range(len(corrected)):
-            keyboard.send("backspace")
-        keyboard.write(orig)
-        threading.Timer(0.15, self._unlock).start()
+        self._last_fix = None
+
+        def _do():
+            time.sleep(0.02)
+            for _ in range(len(corrected)):
+                keyboard.send("backspace")
+            keyboard.write(orig)
+            time.sleep(0.05)
+            self._swapping = False
+
+        threading.Thread(target=_do, daemon=True).start()
 
         key = f"{orig.lower()}->{corrected.lower()}"
         self._rejections[key] += 1
         if self._rejections[key] >= 2:
             self._suppressed.add(orig.lower())
 
-        self._last_fix = None
         return True
-
-    def _unlock(self):
-        self._swapping = False
 
     def _learn(self, word: str):
         low = word.lower()
