@@ -43,8 +43,6 @@ QWERTY = {
     'b': (4.75, 2), 'n': (5.75, 2), 'm': (6.75, 2),
 }
 
-MAX_KEY_DIST = 3.2
-
 GRAMMAR = {
     "aint": "ain't", "arent": "aren't", "cant": "can't", "cnat": "can't",
     "cmon": "c'mon", "coudlnt": "couldn't", "coulndt": "couldn't",
@@ -76,22 +74,6 @@ PHONETIC_SWAPS = {
     'kn': 'n', 'wr': 'r', 'gn': 'n', 'gh': 'g',
     'wh': 'w', 'ck': 'k', 'ght': 't', 'tch': 'ch',
 }
-
-W_FREQ = 0.25
-W_DIST = 0.30
-W_KBD = 0.10
-W_FIRST = 0.15
-W_PHON = 0.10
-W_PATTERN = 0.10
-
-CONF_THRESH = 0.70
-CONF_SHORT = 0.82
-KNOWN_FLOOR = 5000
-AMBIGUITY_GAP = 0.12
-UNDO_WINDOW = 3.0
-LEARN_AFTER = 3
-REJECT_AFTER = 2
-SAVE_EVERY = 50
 
 
 class Corrector:
@@ -129,7 +111,7 @@ class Corrector:
     def _key_dist(self, a: str, b: str) -> float:
         pa, pb = QWERTY.get(a), QWERTY.get(b)
         if not pa or not pb:
-            return MAX_KEY_DIST
+            return 3.2
         return math.hypot(pa[0] - pb[0], pa[1] - pb[1])
 
     def _kbd_score(self, typed: str, cand: str) -> float:
@@ -139,10 +121,9 @@ class Corrector:
                 dists.append(self._key_dist(typed[i], cand[i]))
         if not dists:
             return 1.0
-        return max(0.0, 1.0 - (sum(dists) / len(dists)) / MAX_KEY_DIST)
+        return max(0.0, 1.0 - (sum(dists) / len(dists)) / 3.2)
 
     def _pattern_score(self, typed: str, cand: str) -> float:
-        # transposition: teh -> the
         if len(typed) == len(cand):
             diffs = [i for i in range(len(typed)) if typed[i] != cand[i]]
             if (len(diffs) == 2
@@ -151,13 +132,11 @@ class Corrector:
                     and typed[diffs[1]] == cand[diffs[0]]):
                 return 0.9
 
-        # doubled letter: letterr -> letter
         if len(typed) == len(cand) + 1:
             for i in range(len(typed) - 1):
                 if typed[i] == typed[i + 1] and typed[:i] + typed[i + 1:] == cand:
                     return 0.7
 
-        # dropped letter: writng -> writing
         if len(cand) == len(typed) + 1:
             for i in range(len(cand)):
                 if cand[:i] + cand[i + 1:] == typed:
@@ -179,8 +158,8 @@ class Corrector:
 
         pattern = self._pattern_score(t, c)
 
-        return (W_FREQ * freq + W_DIST * dist + W_KBD * kbd
-                + W_FIRST * first + W_PHON * phon + W_PATTERN * pattern)
+        return (0.25 * freq + 0.30 * dist + 0.10 * kbd
+                + 0.15 * first + 0.10 * phon + 0.10 * pattern)
 
     def _phonetic_fallback(self, word: str) -> str | None:
         low = word.lower()
@@ -189,7 +168,7 @@ class Corrector:
                 continue
             alt = low.replace(old, new, 1)
             hits = self._spell.lookup(alt, Verbosity.CLOSEST, max_edit_distance=1)
-            if hits and hits[0].distance <= 1 and hits[0].count >= KNOWN_FLOOR:
+            if hits and hits[0].distance <= 1 and hits[0].count >= 5000:
                 return self._transfer_case(word, hits[0].term)
         return None
 
@@ -216,8 +195,7 @@ class Corrector:
         if not hits:
             return self._phonetic_fallback(word)
 
-        # don't touch words that are already correct and common
-        if hits[0].distance == 0 and hits[0].count >= KNOWN_FLOOR:
+        if hits[0].distance == 0 and hits[0].count >= 5000:
             return None
 
         candidates = [(self._score(word, h), h) for h in hits if h.distance > 0]
@@ -227,10 +205,10 @@ class Corrector:
         candidates.sort(key=lambda x: x[0], reverse=True)
         best_sc, best = candidates[0]
 
-        if len(candidates) > 1 and best_sc - candidates[1][0] < AMBIGUITY_GAP:
+        if len(candidates) > 1 and best_sc - candidates[1][0] < 0.12:
             return None
 
-        thresh = CONF_SHORT if len(word) <= 3 else CONF_THRESH
+        thresh = 0.82 if len(word) <= 3 else 0.70
         if best_sc < thresh:
             return None
 
@@ -249,13 +227,11 @@ class Corrector:
         if not self._last_fix:
             return False
         orig, corrected, ts, _ = self._last_fix
-        if time.monotonic() - ts > UNDO_WINDOW:
+        if time.monotonic() - ts > 3.0:
             self._last_fix = None
             return False
 
         self._swapping = True
-        # the user's pending backspace eats the trailing space,
-        # so just nuke the corrected word and type the original back
         for _ in range(len(corrected)):
             keyboard.send("backspace")
         keyboard.write(orig)
@@ -263,7 +239,7 @@ class Corrector:
 
         key = f"{orig.lower()}->{corrected.lower()}"
         self._rejections[key] += 1
-        if self._rejections[key] >= REJECT_AFTER:
+        if self._rejections[key] >= 2:
             self._suppressed.add(orig.lower())
 
         self._last_fix = None
@@ -275,12 +251,12 @@ class Corrector:
     def _learn(self, word: str):
         low = word.lower()
         self._typed[low] += 1
-        if self._typed[low] < LEARN_AFTER or low in self._learned:
+        if self._typed[low] < 3 or low in self._learned:
             return
         self._learned.add(low)
-        self._spell.create_dictionary_entry(low, KNOWN_FLOOR + 1)
+        self._spell.create_dictionary_entry(low, 5001)
         self._dirty += 1
-        if self._dirty >= SAVE_EVERY:
+        if self._dirty >= 50:
             self._save_personal()
 
     def _save_personal(self):
@@ -340,7 +316,6 @@ class Corrector:
             self._skip = False
             return
 
-        # arrow keys, mouse, modifier combos — cursor moved, bail
         self._buf.clear()
         self._skip = False
         self._last_fix = None
