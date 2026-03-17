@@ -160,7 +160,8 @@ class Corrector:
         self._skip = False
         self._prev_word = None
         self._last_fix = None
-        self._last_key_at = 0.0
+        self._pending: list[str] = []
+        self._pending_skip = 0
         self._typed = Counter()
         self._rejections = Counter()
         self._suppressed: set[str] = set()
@@ -315,17 +316,23 @@ class Corrector:
             except Exception:
                 pass
 
+    def _count_letter_chars(self, text: str) -> int:
+        return sum(1 for c in text if c.isalpha() or c == "'")
+
     def _send_fix(self, original: str, corrected: str, trigger: str):
         self._swapping = True
+        suffix = {"enter": "\n", "tab": "\t"}.get(trigger, " ")
+        text = corrected + suffix
+        self._pending_skip = self._count_letter_chars(text)
 
         def _do():
             try:
                 time.sleep(0.02)
                 for _ in range(len(original) + 1):
                     keyboard.send("backspace")
-                suffix = {"enter": "\n", "tab": "\t"}.get(trigger, " ")
-                self._type_text(corrected + suffix)
+                self._type_text(text)
                 self._last_fix = (original, corrected, time.monotonic(), trigger)
+                time.sleep(0.03)
             finally:
                 self._swapping = False
 
@@ -341,6 +348,7 @@ class Corrector:
 
         self._swapping = True
         self._last_fix = None
+        self._pending_skip = self._count_letter_chars(orig)
 
         def _do():
             try:
@@ -348,6 +356,7 @@ class Corrector:
                 for _ in range(len(corrected)):
                     keyboard.send("backspace")
                 self._type_text(orig)
+                time.sleep(0.03)
             finally:
                 self._swapping = False
 
@@ -376,18 +385,28 @@ class Corrector:
         self._personal.write_text("\n".join(lines) + "\n", encoding="utf-8")
         self._dirty = 0
 
+    def _drain_pending(self):
+        if not self._pending:
+            return
+        real = self._pending[self._pending_skip:]
+        self._buf.extend(real)
+        self._pending.clear()
+        self._pending_skip = 0
+
     def __call__(self, event):
-        if self._swapping or event.event_type == "up":
+        if event.event_type == "up":
             return
 
         k = event.name
-        now = time.monotonic()
+
+        if self._swapping:
+            if len(k) == 1 and (k.isalpha() or k == "'"):
+                self._pending.append(k)
+            return
+
+        self._drain_pending()
 
         if len(k) == 1 and (k.isalpha() or k == "'"):
-            if now - self._last_key_at > 2.0:
-                self._buf.clear()
-                self._skip = False
-            self._last_key_at = now
             if self._last_fix:
                 self._last_fix = None
             self._buf.append(k)
