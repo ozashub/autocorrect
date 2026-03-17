@@ -34,45 +34,121 @@ from symspellpy.symspellpy import SymSpell, Verbosity
 
 
 QWERTY = {
-    'q': (0, 0), 'w': (1, 0), 'e': (2, 0), 'r': (3, 0), 't': (4, 0),
-    'y': (5, 0), 'u': (6, 0), 'i': (7, 0), 'o': (8, 0), 'p': (9, 0),
-    'a': (0.25, 1), 's': (1.25, 1), 'd': (2.25, 1), 'f': (3.25, 1),
-    'g': (4.25, 1), 'h': (5.25, 1), 'j': (6.25, 1), 'k': (7.25, 1),
-    'l': (8.25, 1),
-    'z': (0.75, 2), 'x': (1.75, 2), 'c': (2.75, 2), 'v': (3.75, 2),
-    'b': (4.75, 2), 'n': (5.75, 2), 'm': (6.75, 2),
+    "q": (0, 0),
+    "w": (1, 0),
+    "e": (2, 0),
+    "r": (3, 0),
+    "t": (4, 0),
+    "y": (5, 0),
+    "u": (6, 0),
+    "i": (7, 0),
+    "o": (8, 0),
+    "p": (9, 0),
+    "a": (0.25, 1),
+    "s": (1.25, 1),
+    "d": (2.25, 1),
+    "f": (3.25, 1),
+    "g": (4.25, 1),
+    "h": (5.25, 1),
+    "j": (6.25, 1),
+    "k": (7.25, 1),
+    "l": (8.25, 1),
+    "z": (0.75, 2),
+    "x": (1.75, 2),
+    "c": (2.75, 2),
+    "v": (3.75, 2),
+    "b": (4.75, 2),
+    "n": (5.75, 2),
+    "m": (6.75, 2),
 }
 
 GRAMMAR = {
-    "aint": "ain't", "arent": "aren't", "cant": "can't", "cnat": "can't",
-    "cmon": "c'mon", "coudlnt": "couldn't", "coulndt": "couldn't",
-    "coudn": "couldn't", "coudln": "couldn't", "couldnt": "couldn't",
-    "couldve": "could've", "didnt": "didn't", "didint": "didn't",
-    "doesnt": "doesn't", "dosen": "doesn't", "doens": "doesn't",
-    "dosn": "doesn't", "dont": "don't", "odnt": "don't",
-    "hadnt": "hadn't", "hasnt": "hasn't", "havent": "haven't",
-    "hed": "he'd", "heres": "here's", "hes": "he's", "howd": "how'd",
-    "hows": "how's", "i": "I", "id": "I'd", "ill": "I'll", "im": "I'm",
-    "isnt": "isn't", "itll": "it'll", "ive": "I've",
-    "mightnt": "mightn't", "mightve": "might've", "mustnt": "mustn't",
-    "oughtnt": "oughtn't", "shant": "shan't", "shes": "she's",
-    "sholdnt": "shouldn't", "shoudlnt": "shouldn't",
-    "shouldnt": "shouldn't", "shouldent": "shouldn't",
-    "shouldve": "should've", "thats": "that's", "thtas": "that's",
-    "thast": "that's", "theres": "there's", "theyd": "they'd",
-    "theyll": "they'll", "theyre": "they're", "theyve": "they've",
-    "tisn": "it's", "wasnt": "wasn't", "weere": "we're",
-    "werent": "weren't", "weve": "we've", "whats": "what's",
-    "whos": "who's", "whyd": "why'd", "wont": "won't",
-    "woudlnt": "wouldn't", "wouldnt": "wouldn't", "wouldve": "would've",
-    "yall": "y'all", "youd": "you'd", "youll": "you'll",
-    "youre": "you're", "youve": "you've", "wed": "we'd",
+    "aint": "ain't",
+    "arent": "aren't",
+    "cant": "can't",
+    "cnat": "can't",
+    "cmon": "c'mon",
+    "coudlnt": "couldn't",
+    "coulndt": "couldn't",
+    "coudn": "couldn't",
+    "coudln": "couldn't",
+    "couldnt": "couldn't",
+    "couldve": "could've",
+    "didnt": "didn't",
+    "didint": "didn't",
+    "doesnt": "doesn't",
+    "dosen": "doesn't",
+    "doens": "doesn't",
+    "dosn": "doesn't",
+    "dont": "don't",
+    "odnt": "don't",
+    "hadnt": "hadn't",
+    "hasnt": "hasn't",
+    "havent": "haven't",
+    "hed": "he'd",
+    "heres": "here's",
+    "hes": "he's",
+    "howd": "how'd",
+    "hows": "how's",
+    "i": "I",
+    "id": "I'd",
+    "ill": "I'll",
+    "im": "I'm",
+    "isnt": "isn't",
+    "itll": "it'll",
+    "ive": "I've",
+    "mightnt": "mightn't",
+    "mightve": "might've",
+    "mustnt": "mustn't",
+    "oughtnt": "oughtn't",
+    "shant": "shan't",
+    "shes": "she's",
+    "sholdnt": "shouldn't",
+    "shoudlnt": "shouldn't",
+    "shouldnt": "shouldn't",
+    "shouldent": "shouldn't",
+    "shouldve": "should've",
+    "thats": "that's",
+    "thtas": "that's",
+    "thast": "that's",
+    "theres": "there's",
+    "theyd": "they'd",
+    "theyll": "they'll",
+    "theyre": "they're",
+    "theyve": "they've",
+    "tisn": "it's",
+    "wasnt": "wasn't",
+    "weere": "we're",
+    "werent": "weren't",
+    "weve": "we've",
+    "whats": "what's",
+    "whos": "who's",
+    "whyd": "why'd",
+    "wont": "won't",
+    "woudlnt": "wouldn't",
+    "wouldnt": "wouldn't",
+    "wouldve": "would've",
+    "yall": "y'all",
+    "youd": "you'd",
+    "youll": "you'll",
+    "youre": "you're",
+    "youve": "you've",
+    "wed": "we'd",
 }
 
 PHONETIC_SWAPS = {
-    'ph': 'f', 'f': 'ph', 'k': 'c', 'c': 'k',
-    'kn': 'n', 'wr': 'r', 'gn': 'n', 'gh': 'g',
-    'wh': 'w', 'ck': 'k', 'ght': 't', 'tch': 'ch',
+    "ph": "f",
+    "f": "ph",
+    "k": "c",
+    "c": "k",
+    "kn": "n",
+    "wr": "r",
+    "gn": "n",
+    "gh": "g",
+    "wh": "w",
+    "ck": "k",
+    "ght": "t",
+    "tch": "ch",
 }
 
 
@@ -126,20 +202,22 @@ class Corrector:
     def _pattern_score(self, typed: str, cand: str) -> float:
         if len(typed) == len(cand):
             diffs = [i for i in range(len(typed)) if typed[i] != cand[i]]
-            if (len(diffs) == 2
-                    and diffs[1] == diffs[0] + 1
-                    and typed[diffs[0]] == cand[diffs[1]]
-                    and typed[diffs[1]] == cand[diffs[0]]):
+            if (
+                len(diffs) == 2
+                and diffs[1] == diffs[0] + 1
+                and typed[diffs[0]] == cand[diffs[1]]
+                and typed[diffs[1]] == cand[diffs[0]]
+            ):
                 return 0.9
 
         if len(typed) == len(cand) + 1:
             for i in range(len(typed) - 1):
-                if typed[i] == typed[i + 1] and typed[:i] + typed[i + 1:] == cand:
+                if typed[i] == typed[i + 1] and typed[:i] + typed[i + 1 :] == cand:
                     return 0.7
 
         if len(cand) == len(typed) + 1:
             for i in range(len(cand)):
-                if cand[:i] + cand[i + 1:] == typed:
+                if cand[:i] + cand[i + 1 :] == typed:
                     return 0.7
 
         return 0.0
@@ -147,7 +225,7 @@ class Corrector:
     def _score(self, typed: str, hit) -> float:
         t, c = typed.lower(), hit.term.lower()
         freq = math.log1p(hit.count) / self._max_freq
-        dist = 1.0 - hit.distance / 2.0
+        dist = 1.0 - hit.distance * 0.25
         kbd = self._kbd_score(t, c)
         first = 1.0 if t[0] == c[0] else 0.3
 
@@ -158,8 +236,14 @@ class Corrector:
 
         pattern = self._pattern_score(t, c)
 
-        return (0.25 * freq + 0.30 * dist + 0.10 * kbd
-                + 0.15 * first + 0.10 * phon + 0.10 * pattern)
+        return (
+            0.25 * freq
+            + 0.30 * dist
+            + 0.10 * kbd
+            + 0.15 * first
+            + 0.10 * phon
+            + 0.10 * pattern
+        )
 
     def _phonetic_fallback(self, word: str) -> str | None:
         low = word.lower()
@@ -291,13 +375,15 @@ class Corrector:
                     self._learn(raw)
                     if self._after_punct and raw[0].islower() and len(raw) > 1:
                         cap = raw[0].upper() + raw[1:]
-                        hits = self._spell.lookup(cap, Verbosity.CLOSEST, max_edit_distance=0)
+                        hits = self._spell.lookup(
+                            cap, Verbosity.CLOSEST, max_edit_distance=0
+                        )
                         if not hits:
                             self._send_fix(raw, cap, k)
                 self._prev_word = (fix or raw).lower()
             self._buf.clear()
             self._skip = False
-            self._after_punct = (k == "enter")
+            self._after_punct = k == "enter"
             return
 
         if k == "backspace":
