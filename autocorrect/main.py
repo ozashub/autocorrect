@@ -199,7 +199,7 @@ class Corrector:
                 # drain: SendInput queues events, hook sees them after this returns.
                 # without this, _injecting clears before the hook processes our output
                 # and injected chars leak into the buffer as fake user input.
-                time.sleep(0.15)
+                time.sleep(0.02)
             finally:
                 self._buf.clear()
                 self._injecting = False
