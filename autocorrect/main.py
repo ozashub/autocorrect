@@ -19,6 +19,7 @@ def _bootstrap():
 
 _bootstrap()
 
+import time
 import keyboard
 import threading
 from pathlib import Path
@@ -154,14 +155,13 @@ class Corrector:
             try:
                 for _ in range(n_bs):
                     keyboard.send("backspace")
-                for ch in text:
-                    try:
-                        keyboard.write(ch)
-                    except Exception:
-                        pass
-            finally:
-                self._buf.clear()
-                self._injecting = False
+                keyboard.write(text)
+            except Exception:
+                pass
+            # let pending key events drain through the hook before
+            # we start listening again — SendInput is async on Windows
+            time.sleep(0.02)
+            self._injecting = False
 
         threading.Thread(target=go, daemon=True).start()
 
