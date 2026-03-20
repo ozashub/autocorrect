@@ -167,25 +167,20 @@ class Corrector:
         hits = self._spell.lookup(low, Verbosity.ALL, max_edit_distance=max_dist)
 
         if hits:
-            exact = hits[0] if hits[0].distance == 0 else None
-            if exact and exact.count >= 5000:
+            if hits[0].distance == 0:
                 return None
 
             # typos rarely get the first letter wrong
             candidates = [
                 h for h in hits
-                if h.distance > 0 and h.count >= 800 and h.term[0] == low[0]
+                if h.count >= 800 and h.term[0] == low[0]
             ]
             if not candidates:
-                candidates = [
-                    h for h in hits
-                    if h.distance > 0 and h.count >= 5000
-                ]
+                candidates = [h for h in hits if h.count >= 5000]
 
             if candidates:
                 best = min(candidates, key=lambda h: (h.distance, len(h.term) != len(low), -h.count))
-                if not exact or best.count >= exact.count * 10:
-                    return self._match_case(word, best.term)
+                return self._match_case(word, best.term)
 
         # garble recovery — long gibberish that started as a real word
         if len(low) > 10:
