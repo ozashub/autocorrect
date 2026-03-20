@@ -23,6 +23,7 @@ _bootstrap()
 
 import keyboard
 import threading
+import time
 from pathlib import Path
 from symspellpy.symspellpy import SymSpell, Verbosity
 
@@ -61,6 +62,7 @@ class Corrector:
         self._spell = SymSpell(max_dictionary_edit_distance=3, prefix_length=7)
         self._buf: list[str] = []
         self._hooked = False
+        self._last_fix = None
 
         if cache_path.exists():
             self._spell.load_pickle(str(cache_path))
@@ -137,7 +139,19 @@ class Corrector:
         fix = self._lookup(raw)
         if fix and fix != raw:
             self._inject(len(raw) + 1, fix + suffix)
+            self._last_fix = (raw, fix, time.monotonic())
         self._buf.clear()
+
+    def _undo(self):
+        if not self._last_fix:
+            return False
+        orig, corrected, ts = self._last_fix
+        if time.monotonic() - ts > 1.5:
+            self._last_fix = None
+            return False
+        self._last_fix = None
+        self._inject(len(corrected), orig + " ")
+        return True
 
     def __call__(self, event):
         if event.event_type == "up":
@@ -146,6 +160,7 @@ class Corrector:
         k = event.name
 
         if len(k) == 1 and (k.isalpha() or k == "'"):
+            self._last_fix = None
             self._buf.append(k)
             return
 
@@ -159,11 +174,15 @@ class Corrector:
             return
 
         if k == "backspace":
+            if not self._buf and self._last_fix:
+                self._undo()
+                return
             if self._buf:
                 self._buf.pop()
             return
 
         self._buf.clear()
+        self._last_fix = None
 
     def run(self):
         keyboard.hook(self)
