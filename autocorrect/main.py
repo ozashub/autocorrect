@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
+import ctypes
+import ctypes.wintypes as w
 import importlib.util
 import os
 import subprocess
 import sys
 import threading
+import time
 from pathlib import Path
 
 
@@ -22,6 +25,54 @@ _bootstrap()
 
 import keyboard
 from symspellpy import SymSpell, Verbosity
+
+
+class _KEYBDINPUT(ctypes.Structure):
+    _fields_ = [
+        ("wVk", w.WORD), ("wScan", w.WORD),
+        ("dwFlags", w.DWORD), ("time", w.DWORD),
+        ("dwExtraInfo", ctypes.POINTER(ctypes.c_ulong)),
+    ]
+
+
+class _INPUT(ctypes.Structure):
+    class _U(ctypes.Union):
+        _fields_ = [("ki", _KEYBDINPUT)]
+    _fields_ = [("type", w.DWORD), ("u", _U)]
+
+
+_user32 = ctypes.windll.user32
+_INPUT_KEYBOARD = 1
+_KEYEVENTF_UNICODE = 4
+_KEYEVENTF_KEYUP = 2
+_VK_BACK = 0x08
+_VK_CTRL = 0x11
+
+
+def _replace_word(text):
+    evts = []
+
+    # ctrl+backspace — nuke the word
+    for vk, flags in [
+        (_VK_CTRL, 0), (_VK_BACK, 0),
+        (_VK_BACK, _KEYEVENTF_KEYUP), (_VK_CTRL, _KEYEVENTF_KEYUP),
+    ]:
+        e = _INPUT(type=_INPUT_KEYBOARD)
+        e.u.ki.wVk = vk
+        e.u.ki.dwFlags = flags
+        evts.append(e)
+
+    # type replacement via unicode — no key mapping needed
+    for ch in text:
+        for flags in (_KEYEVENTF_UNICODE, _KEYEVENTF_UNICODE | _KEYEVENTF_KEYUP):
+            e = _INPUT(type=_INPUT_KEYBOARD)
+            e.u.ki.wScan = ord(ch)
+            e.u.ki.dwFlags = flags
+            evts.append(e)
+
+    arr = (_INPUT * len(evts))(*evts)
+    _user32.SendInput(len(evts), arr, ctypes.sizeof(_INPUT))
+
 
 GRAMMAR = {
     "aint": "ain't", "arent": "aren't", "cant": "can't", "cnat": "can't",
@@ -53,6 +104,11 @@ GRAMMAR = {
 WORD_BREAKS = set(";,.!?:")
 
 
+def _is_subseq(needle, haystack):
+    it = iter(haystack)
+    return all(c in it for c in needle)
+
+
 class Corrector:
     def __init__(self, dict_path: Path, personal_path: Path, cache_path: Path):
         self._spell = SymSpell(max_dictionary_edit_distance=3, prefix_length=7)
@@ -78,6 +134,16 @@ class Corrector:
             return tgt[0].upper() + tgt[1:]
         return tgt
 
+    def _recover_garble(self, low):
+        prefix = low[:2]
+        best, best_freq = None, 0
+        for term, freq in self._spell.words.items():
+            if freq < 5000 or len(term) < 4 or term[:2] != prefix:
+                continue
+            if _is_subseq(term, low) and freq > best_freq:
+                best, best_freq = term, freq
+        return best
+
     def _lookup(self, word):
         low = word.lower()
 
@@ -90,41 +156,46 @@ class Corrector:
 
         max_dist = 1 if len(low) <= 4 else 2 if len(low) <= 7 else 3
         hits = self._spell.lookup(low, Verbosity.ALL, max_edit_distance=max_dist)
-        if not hits:
-            return None
 
-        exact = hits[0] if hits[0].distance == 0 else None
-        if exact and exact.count >= 5000:
-            return None
+        if hits:
+            exact = hits[0] if hits[0].distance == 0 else None
+            if exact and exact.count >= 5000:
+                return None
 
-        # typos rarely get the first letter wrong
-        candidates = [
-            h for h in hits
-            if h.distance > 0 and h.count >= 800 and h.term[0] == low[0]
-        ]
-        if not candidates:
+            # typos rarely get the first letter wrong
             candidates = [
                 h for h in hits
-                if h.distance > 0 and h.count >= 5000
+                if h.distance > 0 and h.count >= 800 and h.term[0] == low[0]
             ]
-        if not candidates:
-            return None
+            if not candidates:
+                candidates = [
+                    h for h in hits
+                    if h.distance > 0 and h.count >= 5000
+                ]
 
-        # same length = substitution (hellp→hello), different length = insert/delete (hellp→help)
-        best = min(candidates, key=lambda h: (h.distance, len(h.term) != len(low), -h.count))
+            if candidates:
+                best = min(candidates, key=lambda h: (h.distance, len(h.term) != len(low), -h.count))
+                if not exact or best.count >= exact.count * 10:
+                    return self._match_case(word, best.term)
 
-        if exact and best.count < exact.count * 10:
-            return None
+        # garble recovery — long gibberish that started as a real word
+        if len(low) > 10:
+            recovered = self._recover_garble(low)
+            if recovered:
+                return self._match_case(word, recovered)
 
-        return self._match_case(word, best.term)
+        return None
 
     def _inject(self, text):
         self._injecting = True
 
         def go():
             try:
-                keyboard.send("ctrl+backspace")
-                keyboard.write(text, delay=0)
+                _replace_word(text)
+                # drain: SendInput queues events, hook sees them after this returns.
+                # without this, _injecting clears before the hook processes our output
+                # and injected chars leak into the buffer as fake user input.
+                time.sleep(0.05)
             finally:
                 self._buf.clear()
                 self._injecting = False
