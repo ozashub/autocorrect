@@ -13,8 +13,10 @@ def _bootstrap():
     ]
     if missing:
         subprocess.check_call([sys.executable, "-m", "pip", "install", *missing])
-        subprocess.Popen([sys.executable, os.path.abspath(sys.argv[0])] + sys.argv[1:])
-        sys.exit(0)
+        os.execv(
+            sys.executable,
+            [sys.executable, os.path.abspath(sys.argv[0])] + sys.argv[1:],
+        )
 
 
 _bootstrap()
@@ -51,14 +53,14 @@ _GRAMMAR = {
     "youre": "you're", "youve": "you've", "wed": "we'd",
 }
 
-_PUNCT = set(",.!?:;")
+WORD_BREAKS = set(";,.!?:")
 
 
 class Corrector:
     def __init__(self, dict_path: Path, personal_path: Path, cache_path: Path):
         self._spell = SymSpell(max_dictionary_edit_distance=3, prefix_length=7)
         self._buf: list[str] = []
-        self._injecting = False
+        self._hooked = False
 
         if cache_path.exists():
             self._spell.load_pickle(str(cache_path))
@@ -72,18 +74,11 @@ class Corrector:
             self._spell.load_dictionary(str(personal_path), 0, 1)
 
     def _transfer_case(self, src, tgt):
-        if src == src.lower():
-            return tgt.lower()
-        if src == src.upper():
+        if src.isupper():
             return tgt.upper()
-        # char-by-char — covers stuff like "FUrthermore"
-        out = []
-        for i, ch in enumerate(tgt):
-            if i < len(src) and src[i].isupper():
-                out.append(ch.upper())
-            else:
-                out.append(ch.lower())
-        return "".join(out)
+        if src[0].isupper():
+            return tgt[0].upper() + tgt[1:]
+        return tgt
 
     def _lookup(self, word):
         low = word.lower()
@@ -101,30 +96,24 @@ class Corrector:
             return None
 
         if hits[0].distance == 0:
+            # legit word — freq 5000+ means the user probably meant it
+            if hits[0].count >= 5000:
+                return None
+            # junk entry — check if there's something way better at distance 1
+            real = [h for h in hits if h.distance == 1 and h.count >= 5000]
+            if not real:
+                return None
+            return self._transfer_case(word, real[0].term)
+
+        best = hits[0]
+        if best.count < 1000:
             return None
 
-        # grab everything that's not a junk dictionary ghost
-        pool = [h for h in hits if h.distance > 0 and h.count >= 1000]
-        if not pool:
-            return None
-
-        wlen = len(word)
-        best = None
-        best_score = -1
-        for h in pool:
-            # closer length to what was typed = probably what they meant
-            len_diff = abs(len(h.term) - wlen)
-            score = h.count / (1 + len_diff * 5000)
-            if score > best_score:
-                best_score = score
-                best = h
-
-        if not best:
-            return None
         return self._transfer_case(word, best.term)
 
     def _inject(self, n_bs, text):
-        self._injecting = True
+        keyboard.unhook(self)
+        self._hooked = False
 
         def go():
             try:
@@ -136,8 +125,8 @@ class Corrector:
                     except Exception:
                         pass
             finally:
-                self._buf.clear()
-                self._injecting = False
+                keyboard.hook(self)
+                self._hooked = True
 
         threading.Thread(target=go, daemon=True).start()
 
@@ -145,33 +134,22 @@ class Corrector:
         if not self._buf:
             return
         raw = "".join(self._buf)
-        # strip accidental punctuation that landed mid-word (like semicolons)
-        clean = "".join(c for c in raw if c.isalpha() or c == "'")
-        if not clean:
-            self._buf.clear()
-            return
-
-        fix = self._lookup(clean)
-        if fix and fix != clean:
+        fix = self._lookup(raw)
+        if fix and fix != raw:
             self._inject(len(raw) + 1, fix + suffix)
-        elif clean != raw:
-            # word is fine but has junk chars mixed in — strip them out
-            self._inject(len(raw) + 1, clean + suffix)
         self._buf.clear()
 
     def __call__(self, event):
         if event.event_type == "up":
             return
-        if self._injecting:
-            return
 
         k = event.name
 
-        if len(k) == 1 and (k.isalpha() or k == "'" or k == ";"):
+        if len(k) == 1 and (k.isalpha() or k == "'"):
             self._buf.append(k)
             return
 
-        if len(k) == 1 and k in _PUNCT:
+        if len(k) == 1 and k in WORD_BREAKS:
             self._commit(k)
             return
 
@@ -189,6 +167,7 @@ class Corrector:
 
     def run(self):
         keyboard.hook(self)
+        self._hooked = True
         print("autocorrect active")
         keyboard.wait()
 
