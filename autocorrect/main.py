@@ -35,9 +35,18 @@ class _KEYBDINPUT(ctypes.Structure):
     ]
 
 
+class _MOUSEINPUT(ctypes.Structure):
+    _fields_ = [
+        ("dx", w.LONG), ("dy", w.LONG),
+        ("mouseData", w.DWORD), ("dwFlags", w.DWORD),
+        ("time", w.DWORD),
+        ("dwExtraInfo", ctypes.POINTER(ctypes.c_ulong)),
+    ]
+
+
 class _INPUT(ctypes.Structure):
     class _U(ctypes.Union):
-        _fields_ = [("ki", _KEYBDINPUT)]
+        _fields_ = [("ki", _KEYBDINPUT), ("mi", _MOUSEINPUT)]
     _fields_ = [("type", w.DWORD), ("u", _U)]
 
 
