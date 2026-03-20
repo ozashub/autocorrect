@@ -4,7 +4,6 @@ import os
 import subprocess
 import sys
 import threading
-import time
 from pathlib import Path
 
 
@@ -111,7 +110,8 @@ class Corrector:
         if not candidates:
             return None
 
-        best = min(candidates, key=lambda h: (h.distance, -h.count))
+        # same length = substitution (hellp→hello), different length = insert/delete (hellp→help)
+        best = min(candidates, key=lambda h: (h.distance, len(h.term) != len(low), -h.count))
 
         if exact and best.count < exact.count * 10:
             return None
@@ -125,8 +125,7 @@ class Corrector:
             try:
                 for _ in range(n_bs):
                     keyboard.send("backspace")
-                keyboard.write(text)
-                time.sleep(0.05)
+                keyboard.write(text, delay=0)
             finally:
                 self._buf.clear()
                 self._injecting = False
