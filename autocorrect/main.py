@@ -37,7 +37,16 @@ VK_CONTROL = 0x11
 VK_MENU = 0x12
 VK_CAPITAL = 0x14
 
-HOOKPROC = ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.c_int, w.WPARAM, w.LPARAM)
+LRESULT = ctypes.c_ssize_t
+HOOKPROC = ctypes.WINFUNCTYPE(LRESULT, ctypes.c_int, w.WPARAM, w.LPARAM)
+
+user32.SetWindowsHookExW.argtypes = [ctypes.c_int, HOOKPROC, w.HINSTANCE, w.DWORD]
+user32.SetWindowsHookExW.restype = ctypes.c_void_p
+user32.CallNextHookEx.argtypes = [ctypes.c_void_p, ctypes.c_int, w.WPARAM, w.LPARAM]
+user32.CallNextHookEx.restype = LRESULT
+user32.SendInput.argtypes = [ctypes.c_uint, ctypes.c_void_p, ctypes.c_int]
+user32.SendInput.restype = ctypes.c_uint
+user32.UnhookWindowsHookEx.argtypes = [ctypes.c_void_p]
 
 
 class KBDLLHOOKSTRUCT(ctypes.Structure):
