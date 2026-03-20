@@ -1,125 +1,28 @@
 #!/usr/bin/env python3
-import ctypes
-import ctypes.wintypes as w
 import importlib.util
 import os
 import subprocess
 import sys
+import threading
+import time
 from pathlib import Path
 
 
 def _bootstrap():
-    if importlib.util.find_spec("symspellpy") is None:
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "symspellpy"])
+    missing = [
+        pkg
+        for pkg, mod in [("keyboard", "keyboard"), ("symspellpy", "symspellpy")]
+        if importlib.util.find_spec(mod) is None
+    ]
+    if missing:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", *missing])
         os.execv(sys.executable, [sys.executable, os.path.abspath(sys.argv[0])] + sys.argv[1:])
 
 
 _bootstrap()
 
+import keyboard
 from symspellpy import SymSpell, Verbosity
-
-user32 = ctypes.WinDLL("user32", use_last_error=True)
-kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-
-WH_KEYBOARD_LL = 13
-WM_KEYDOWN = 0x0100
-WM_SYSKEYDOWN = 0x0104
-LLKHF_INJECTED = 0x10
-INPUT_KEYBOARD = 1
-KEYEVENTF_UNICODE = 4
-KEYEVENTF_KEYUP = 2
-VK_BACK = 0x08
-VK_SPACE = 0x20
-VK_RETURN = 0x0D
-VK_TAB = 0x09
-VK_SHIFT = 0x10
-VK_CONTROL = 0x11
-VK_MENU = 0x12
-VK_CAPITAL = 0x14
-
-LRESULT = ctypes.c_ssize_t
-HOOKPROC = ctypes.WINFUNCTYPE(LRESULT, ctypes.c_int, w.WPARAM, w.LPARAM)
-
-user32.SetWindowsHookExW.argtypes = [ctypes.c_int, HOOKPROC, w.HINSTANCE, w.DWORD]
-user32.SetWindowsHookExW.restype = ctypes.c_void_p
-user32.CallNextHookEx.argtypes = [ctypes.c_void_p, ctypes.c_int, w.WPARAM, w.LPARAM]
-user32.CallNextHookEx.restype = LRESULT
-user32.SendInput.argtypes = [ctypes.c_uint, ctypes.c_void_p, ctypes.c_int]
-user32.SendInput.restype = ctypes.c_uint
-user32.UnhookWindowsHookEx.argtypes = [ctypes.c_void_p]
-
-
-class KBDLLHOOKSTRUCT(ctypes.Structure):
-    _fields_ = [
-        ("vkCode", w.DWORD), ("scanCode", w.DWORD),
-        ("flags", w.DWORD), ("time", w.DWORD),
-        ("dwExtraInfo", ctypes.POINTER(ctypes.c_ulong)),
-    ]
-
-
-class KEYBDINPUT(ctypes.Structure):
-    _fields_ = [
-        ("wVk", w.WORD), ("wScan", w.WORD),
-        ("dwFlags", w.DWORD), ("time", w.DWORD),
-        ("dwExtraInfo", ctypes.POINTER(ctypes.c_ulong)),
-    ]
-
-
-class INPUT(ctypes.Structure):
-    class _U(ctypes.Union):
-        _fields_ = [("ki", KEYBDINPUT)]
-    _fields_ = [("type", w.DWORD), ("u", _U)]
-
-
-def _send(inputs):
-    n = len(inputs)
-    arr = (INPUT * n)(*inputs)
-    user32.SendInput(n, arr, ctypes.sizeof(INPUT))
-
-
-def _backspaces(n):
-    out = []
-    for _ in range(n):
-        d = INPUT(type=INPUT_KEYBOARD)
-        d.u.ki.wVk = VK_BACK
-        out.append(d)
-        u = INPUT(type=INPUT_KEYBOARD)
-        u.u.ki.wVk = VK_BACK
-        u.u.ki.dwFlags = KEYEVENTF_KEYUP
-        out.append(u)
-    return out
-
-
-def _typed(text):
-    out = []
-    for ch in text:
-        c = ord(ch)
-        d = INPUT(type=INPUT_KEYBOARD)
-        d.u.ki.wScan = c
-        d.u.ki.dwFlags = KEYEVENTF_UNICODE
-        out.append(d)
-        u = INPUT(type=INPUT_KEYBOARD)
-        u.u.ki.wScan = c
-        u.u.ki.dwFlags = KEYEVENTF_UNICODE | KEYEVENTF_KEYUP
-        out.append(u)
-    return out
-
-
-def _vk_to_char(vk, scan):
-    if 0x41 <= vk <= 0x5A:
-        shifted = bool(user32.GetKeyState(VK_SHIFT) & 0x8000)
-        caps = bool(user32.GetKeyState(VK_CAPITAL) & 1)
-        return chr(vk) if (shifted ^ caps) else chr(vk + 32)
-    state = (ctypes.c_ubyte * 256)()
-    user32.GetKeyboardState(state)
-    buf = (w.WCHAR * 4)()
-    ret = user32.ToUnicode(vk, scan, state, buf, 4, 0)
-    if ret >= 1:
-        return buf[0]
-    if ret == -1:
-        user32.ToUnicode(vk, scan, state, buf, 4, 0)
-    return None
-
 
 GRAMMAR = {
     "aint": "ain't", "arent": "aren't", "cant": "can't", "cnat": "can't",
@@ -167,8 +70,7 @@ class Corrector:
             self._spell.load_dictionary(str(personal_path), 0, 1)
 
         self._buf: list[str] = []
-        self._hook_id = None
-        self._proc = HOOKPROC(self._on_key)
+        self._injecting = False
 
     def _match_case(self, src, tgt):
         if src.isupper():
@@ -216,83 +118,61 @@ class Corrector:
 
         return self._match_case(word, best.term)
 
+    def _inject(self, n_bs, text):
+        self._injecting = True
+
+        def go():
+            try:
+                for _ in range(n_bs):
+                    keyboard.send("backspace")
+                keyboard.write(text)
+                time.sleep(0.05)
+            finally:
+                self._buf.clear()
+                self._injecting = False
+
+        threading.Thread(target=go, daemon=True).start()
+
     def _commit(self, suffix):
         if not self._buf:
-            return False
+            return
         raw = "".join(self._buf)
-        self._buf.clear()
         fix = self._lookup(raw)
-        if not fix or fix == raw:
-            return False
-        _send(_backspaces(len(raw)) + _typed(fix + suffix))
-        return True
-
-    def _on_key(self, code, wparam, lparam):
-        fwd = lambda: user32.CallNextHookEx(self._hook_id, code, wparam, lparam)
-
-        if code != 0:
-            return fwd()
-
-        kb = ctypes.cast(lparam, ctypes.POINTER(KBDLLHOOKSTRUCT)).contents
-
-        if kb.flags & LLKHF_INJECTED:
-            return fwd()
-
-        if wparam != WM_KEYDOWN:
-            if wparam == WM_SYSKEYDOWN:
-                self._buf.clear()
-            return fwd()
-
-        if user32.GetKeyState(VK_CONTROL) & 0x8000 or user32.GetKeyState(VK_MENU) & 0x8000:
+        if fix and fix != raw:
+            self._inject(len(raw) + 1, fix + suffix)
+        else:
             self._buf.clear()
-            return fwd()
 
-        vk = kb.vkCode
+    def __call__(self, event):
+        if event.event_type == "up" or self._injecting:
+            return
 
-        if vk == VK_BACK:
+        k = event.name
+
+        if len(k) == 1 and (k.isalpha() or k == "'"):
+            self._buf.append(k)
+            return
+
+        if len(k) == 1 and k in WORD_BREAKS:
+            self._commit(k)
+            return
+
+        if k in ("space", "enter", "tab"):
+            suffix = {"enter": "\n", "tab": "\t"}.get(k, " ")
+            self._commit(suffix)
+            return
+
+        if k == "backspace":
             if self._buf:
                 self._buf.pop()
-            return fwd()
-
-        if vk in (VK_SPACE, VK_RETURN, VK_TAB):
-            suffix = {VK_RETURN: "\n", VK_TAB: "\t"}.get(vk, " ")
-            if self._commit(suffix):
-                return 1
-            return fwd()
-
-        ch = _vk_to_char(vk, kb.scanCode)
-        if not ch:
-            self._buf.clear()
-            return fwd()
-
-        if ch.isalpha() or ch == "'":
-            self._buf.append(ch)
-            return fwd()
-
-        if ch in WORD_BREAKS:
-            if self._commit(ch):
-                return 1
-            return fwd()
+            return
 
         self._buf.clear()
-        return fwd()
 
     def run(self):
-        self._hook_id = user32.SetWindowsHookExW(
-            WH_KEYBOARD_LL, self._proc,
-            kernel32.GetModuleHandleW("user32"), 0,
-        )
-        if not self._hook_id:
-            err = ctypes.get_last_error()
-            raise RuntimeError(f"failed to install keyboard hook (error {err})")
-
+        keyboard.hook(self)
         print("autocorrect active")
-        msg = w.MSG()
-        while user32.GetMessageW(ctypes.byref(msg), None, 0, 0):
-            user32.TranslateMessage(ctypes.byref(msg))
-            user32.DispatchMessageW(ctypes.byref(msg))
-
-        user32.UnhookWindowsHookEx(self._hook_id)
+        keyboard.wait()
 
 
 if __name__ == "__main__":
