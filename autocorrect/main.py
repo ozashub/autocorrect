@@ -25,9 +25,9 @@ import keyboard
 import threading
 import time
 from pathlib import Path
-from symspellpy.symspellpy import SymSpell, Verbosity
+from symspellpy import SymSpell, Verbosity
 
-_GRAMMAR = {
+GRAMMAR = {
     "aint": "ain't", "arent": "aren't", "cant": "can't", "cnat": "can't",
     "cmon": "c'mon", "coudlnt": "couldn't", "coulndt": "couldn't",
     "coudn": "couldn't", "coudln": "couldn't", "couldnt": "couldn't",
@@ -55,14 +55,14 @@ _GRAMMAR = {
 }
 
 WORD_BREAKS = set(";,.!?:")
+UNDO_WINDOW = 1.5
+FREQ_LEGIT = 5000
+FREQ_FLOOR = 800
 
 
 class Corrector:
     def __init__(self, dict_path: Path, personal_path: Path, cache_path: Path):
         self._spell = SymSpell(max_dictionary_edit_distance=3, prefix_length=7)
-        self._buf: list[str] = []
-        self._hooked = False
-        self._last_fix = None
 
         if cache_path.exists():
             self._spell.load_pickle(str(cache_path))
@@ -75,7 +75,11 @@ class Corrector:
         if personal_path.exists():
             self._spell.load_dictionary(str(personal_path), 0, 1)
 
-    def _transfer_case(self, src, tgt):
+        self._buf: list[str] = []
+        self._injecting = False
+        self._last_fix = None
+
+    def _match_case(self, src, tgt):
         if src.isupper():
             return tgt.upper()
         if src[0].isupper():
@@ -85,50 +89,58 @@ class Corrector:
     def _lookup(self, word):
         low = word.lower()
 
-        gram = _GRAMMAR.get(low)
+        gram = GRAMMAR.get(low)
         if gram:
-            return self._transfer_case(word, gram)
+            return self._match_case(word, gram)
 
-        if len(word) < 2:
+        if len(low) < 2:
             return None
 
-        max_dist = 1 if len(word) <= 4 else 2 if len(word) <= 7 else 3
+        max_dist = 1 if len(low) <= 4 else 2 if len(low) <= 7 else 3
         hits = self._spell.lookup(low, Verbosity.ALL, max_edit_distance=max_dist)
         if not hits:
             return None
 
-        if hits[0].distance == 0:
-            # legit word — freq 5000+ means the user probably meant it
-            if hits[0].count >= 5000:
-                return None
-            # junk entry — check if there's something way better at distance 1
-            real = [h for h in hits if h.distance == 1 and h.count >= 5000]
-            if not real:
-                return None
-            return self._transfer_case(word, real[0].term)
+        exact = hits[0] if hits[0].distance == 0 else None
 
-        best = hits[0]
-        if best.count < 1000:
+        if exact and exact.count >= FREQ_LEGIT:
             return None
 
-        return self._transfer_case(word, best.term)
+        # prefer candidates that share the first letter — typos rarely get that wrong
+        candidates = [
+            h for h in hits
+            if h.distance > 0 and h.count >= FREQ_FLOOR and h.term[0] == low[0]
+        ]
+
+        if not candidates:
+            candidates = [
+                h for h in hits
+                if h.distance > 0 and h.count >= FREQ_LEGIT
+            ]
+
+        if not candidates:
+            return None
+
+        best = min(candidates, key=lambda h: (h.distance, -h.count))
+
+        # word exists in dict already — only override if the candidate dwarfs it
+        if exact and best.count < exact.count * 10:
+            return None
+
+        return self._match_case(word, best.term)
 
     def _inject(self, n_bs, text):
-        keyboard.unhook(self)
-        self._hooked = False
+        self._injecting = True
 
         def go():
             try:
                 for _ in range(n_bs):
                     keyboard.send("backspace")
-                for ch in text:
-                    try:
-                        keyboard.write(ch)
-                    except Exception:
-                        pass
+                keyboard.write(text)
+                time.sleep(0.05)
             finally:
-                keyboard.hook(self)
-                self._hooked = True
+                self._buf.clear()
+                self._injecting = False
 
         threading.Thread(target=go, daemon=True).start()
 
@@ -140,13 +152,14 @@ class Corrector:
         if fix and fix != raw:
             self._inject(len(raw) + 1, fix + suffix)
             self._last_fix = (raw, fix, time.monotonic())
-        self._buf.clear()
+        else:
+            self._buf.clear()
 
     def _undo(self):
         if not self._last_fix:
             return False
         orig, corrected, ts = self._last_fix
-        if time.monotonic() - ts > 1.5:
+        if time.monotonic() - ts > UNDO_WINDOW:
             self._last_fix = None
             return False
         self._last_fix = None
@@ -154,7 +167,7 @@ class Corrector:
         return True
 
     def __call__(self, event):
-        if event.event_type == "up":
+        if event.event_type == "up" or self._injecting:
             return
 
         k = event.name
@@ -186,7 +199,6 @@ class Corrector:
 
     def run(self):
         keyboard.hook(self)
-        self._hooked = True
         print("autocorrect active")
         keyboard.wait()
 
