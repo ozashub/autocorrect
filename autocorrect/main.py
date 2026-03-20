@@ -118,13 +118,12 @@ class Corrector:
 
         return self._match_case(word, best.term)
 
-    def _inject(self, n_bs, text):
+    def _inject(self, text):
         self._injecting = True
 
         def go():
             try:
-                for _ in range(n_bs):
-                    keyboard.send("backspace")
+                keyboard.send("ctrl+backspace")
                 keyboard.write(text, delay=0)
             finally:
                 self._buf.clear()
@@ -138,7 +137,7 @@ class Corrector:
         raw = "".join(self._buf)
         fix = self._lookup(raw)
         if fix and fix != raw:
-            self._inject(len(raw) + 1, fix + suffix)
+            self._inject(fix + suffix)
         else:
             self._buf.clear()
 
