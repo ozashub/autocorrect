@@ -8,24 +8,12 @@ import sys
 from pathlib import Path
 
 
-def _elevate():
-    if ctypes.windll.shell32.IsUserAnAdmin():
-        return
-    ctypes.windll.shell32.ShellExecuteW(
-        None, "runas", sys.executable,
-        " ".join([f'"{os.path.abspath(sys.argv[0])}"'] + sys.argv[1:]),
-        None, 1,
-    )
-    sys.exit(0)
-
-
 def _bootstrap():
     if importlib.util.find_spec("symspellpy") is None:
         subprocess.check_call([sys.executable, "-m", "pip", "install", "symspellpy"])
         os.execv(sys.executable, [sys.executable, os.path.abspath(sys.argv[0])] + sys.argv[1:])
 
 
-_elevate()
 _bootstrap()
 
 from symspellpy import SymSpell, Verbosity
