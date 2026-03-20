@@ -18,8 +18,8 @@ _bootstrap()
 
 from symspellpy import SymSpell, Verbosity
 
-user32 = ctypes.windll.user32
-kernel32 = ctypes.windll.kernel32
+user32 = ctypes.WinDLL("user32", use_last_error=True)
+kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
 
 WH_KEYBOARD_LL = 13
 WM_KEYDOWN = 0x0100
@@ -280,10 +280,11 @@ class Corrector:
     def run(self):
         self._hook_id = user32.SetWindowsHookExW(
             WH_KEYBOARD_LL, self._proc,
-            kernel32.GetModuleHandleW(None), 0,
+            kernel32.GetModuleHandleW("user32"), 0,
         )
         if not self._hook_id:
-            raise RuntimeError("failed to install keyboard hook")
+            err = ctypes.get_last_error()
+            raise RuntimeError(f"failed to install keyboard hook (error {err})")
 
         print("autocorrect active")
         msg = w.MSG()
