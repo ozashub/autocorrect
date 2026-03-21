@@ -11,7 +11,10 @@ from pathlib import Path
 def _bootstrap():
     if importlib.util.find_spec("symspellpy") is None:
         subprocess.check_call([sys.executable, "-m", "pip", "install", "symspellpy"])
-        os.execv(sys.executable, [sys.executable, os.path.abspath(sys.argv[0])] + sys.argv[1:])
+        os.execv(
+            sys.executable,
+            [sys.executable, os.path.abspath(sys.argv[0])] + sys.argv[1:],
+        )
 
 
 _bootstrap()
@@ -94,12 +97,16 @@ class _MOUSEINPUT(ctypes.Structure):
 class _INPUT(ctypes.Structure):
     class _U(ctypes.Union):
         _fields_ = [("ki", _KEYBDINPUT), ("mi", _MOUSEINPUT)]
+
     _fields_ = [("type", wt.DWORD), ("u", _U)]
 
 
 WNDPROC = ctypes.WINFUNCTYPE(
-    ctypes.c_longlong, ctypes.c_void_p, ctypes.c_uint,
-    ctypes.c_size_t, ctypes.c_ssize_t,
+    ctypes.c_longlong,
+    ctypes.c_void_p,
+    ctypes.c_uint,
+    ctypes.c_size_t,
+    ctypes.c_ssize_t,
 )
 
 
@@ -121,7 +128,10 @@ class WNDCLASSEXW(ctypes.Structure):
 
 
 user32.DefWindowProcW.argtypes = [
-    ctypes.c_void_p, ctypes.c_uint, ctypes.c_size_t, ctypes.c_ssize_t,
+    ctypes.c_void_p,
+    ctypes.c_uint,
+    ctypes.c_size_t,
+    ctypes.c_ssize_t,
 ]
 user32.DefWindowProcW.restype = ctypes.c_longlong
 user32.CreateWindowExW.restype = ctypes.c_void_p
@@ -264,13 +274,11 @@ class Corrector:
             self._spell.load_dictionary(str(personal_path), 0, 1)
 
         self._known = {
-            word for word, freq in self._spell.words.items()
-            if freq >= self.MIN_FREQ
+            word for word, freq in self._spell.words.items() if freq >= self.MIN_FREQ
         }
         self._buf: list[str] = []
 
-        print(f"  dict: {len(self._spell.words)} entries, "
-              f"{len(self._known)} known (freq >= {self.MIN_FREQ})")
+        print(f"loaded: {len(self._spell.words)} words")
 
     @staticmethod
     def _match_case(src: str, tgt: str) -> str:
@@ -293,18 +301,7 @@ class Corrector:
         s += min(hit.count / 50_000, 6)
         return s
 
-    def _lookup(self, word: str) -> str | None:
-        low = word.lower()
-
-        gram = GRAMMAR.get(low)
-        if gram:
-            return self._match_case(word, gram)
-
-        if len(low) < 3:
-            return None
-        if low in self._known:
-            return None
-
+    def _try_correct(self, low: str) -> str | None:
         if len(low) <= 4:
             max_dist = 1
         elif len(low) <= 7:
@@ -329,7 +326,30 @@ class Corrector:
         best, best_score = max(scored, key=lambda t: t[1])
         if best_score < 0:
             return None
-        return self._match_case(word, best.term)
+        return best.term
+
+    def _lookup(self, word: str) -> str | None:
+        low = word.lower()
+
+        gram = GRAMMAR.get(low)
+        if gram:
+            return self._match_case(word, gram)
+
+        if len(low) < 3:
+            return None
+        if low in self._known:
+            return None
+
+        fix = self._try_correct(low)
+        if fix:
+            return self._match_case(word, fix)
+
+        # key-mash salvage: user spazzed out mid-word, find the real word buried in the garbage
+        if len(low) >= 7:
+            for i in range(len(low) - 3, 3, -1):
+                if low[:i] in self._known:
+                    return self._match_case(word, low[:i])
+        return None
 
     def _commit(self, suffix: str):
         if not self._buf:
@@ -378,8 +398,11 @@ def _run(corrector: Corrector):
         if msg == WM_INPUT:
             sz = ctypes.c_uint(64)
             user32.GetRawInputData(
-                ctypes.c_void_p(lp), RID_INPUT,
-                raw_buf, ctypes.byref(sz), hdr_sz,
+                ctypes.c_void_p(lp),
+                RID_INPUT,
+                raw_buf,
+                ctypes.byref(sz),
+                hdr_sz,
             )
             hdr = RAWINPUTHEADER.from_buffer(raw_buf)
             if hdr.dwType == RIM_TYPEKEYBOARD:
@@ -404,8 +427,18 @@ def _run(corrector: Corrector):
 
     # HWND_MESSAGE (-3) = message-only window, no visible UI
     hwnd = user32.CreateWindowExW(
-        0, cls_name, None, 0, 0, 0, 0, 0,
-        ctypes.c_void_p(-3), None, hinst, None,
+        0,
+        cls_name,
+        None,
+        0,
+        0,
+        0,
+        0,
+        0,
+        ctypes.c_void_p(-3),
+        None,
+        hinst,
+        None,
     )
     if not hwnd:
         raise RuntimeError(f"CreateWindowExW failed ({ctypes.GetLastError()})")
@@ -415,10 +448,12 @@ def _run(corrector: Corrector):
     rid.usUsage = 0x06
     rid.dwFlags = RIDEV_INPUTSINK
     rid.hwndTarget = hwnd
-    if not user32.RegisterRawInputDevices(ctypes.byref(rid), 1, ctypes.sizeof(RAWINPUTDEVICE)):
+    if not user32.RegisterRawInputDevices(
+        ctypes.byref(rid), 1, ctypes.sizeof(RAWINPUTDEVICE)
+    ):
         raise RuntimeError(f"RegisterRawInputDevices failed ({ctypes.GetLastError()})")
 
-    print("autocorrect active (raw input)  \u2014  press Ctrl+C to quit")
+    print("autocorrect active")
 
     msg = wt.MSG()
     while user32.GetMessageW(ctypes.byref(msg), None, 0, 0) > 0:
