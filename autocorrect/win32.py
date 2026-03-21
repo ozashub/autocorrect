@@ -15,6 +15,8 @@ VK_SHIFT = 0x10
 VK_CTRL = 0x11
 VK_ALT = 0x12
 VK_CAPS = 0x14
+VK_LSHIFT = 0xA0
+VK_RSHIFT = 0xA1
 VK_SPACE = 0x20
 
 WM_INPUT = 0x00FF
@@ -63,6 +65,7 @@ class _KEYBDINPUT(ctypes.Structure):
     ]
 
 
+# only here so the _INPUT union is the right size — we never send mouse events
 class _MOUSEINPUT(ctypes.Structure):
     _fields_ = [
         ("dx", wt.LONG),
@@ -122,7 +125,7 @@ def vkey_to_char(vk, scan):
     if user32.GetAsyncKeyState(VK_ALT) & 0x8000:
         return None
     state = (ctypes.c_ubyte * 256)()
-    for k in (VK_SHIFT, 0xA0, 0xA1):
+    for k in (VK_SHIFT, VK_LSHIFT, VK_RSHIFT):
         if user32.GetAsyncKeyState(k) & 0x8000:
             state[k] = 0x80
     state[VK_CAPS] = user32.GetKeyState(VK_CAPS) & 0xFF
@@ -135,6 +138,7 @@ def vkey_to_char(vk, scan):
 
 
 def nuke_and_retype(n_back, text):
+    # SELF_TAG marks these events so the listener knows to ignore them
     evts = []
     for _ in range(n_back):
         for fl in (0, KF_KEYUP):

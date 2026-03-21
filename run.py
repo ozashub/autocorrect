@@ -12,9 +12,10 @@ if importlib.util.find_spec("symspellpy") is None:
 from autocorrect.corrector import Corrector
 from autocorrect.listener import run
 
-data = Path(__file__).parent / "autocorrect" / "data"
-c = Corrector(data / "dict.txt", data / "personal.txt", data / "cache.pkl")
-try:
-    run(c)
-except KeyboardInterrupt:
-    pass
+if __name__ == "__main__":
+    data = Path(__file__).parent / "autocorrect" / "data"
+    c = Corrector(data / "dict.txt", data / "personal.txt", data / "cache.pkl")
+    try:
+        run(c)
+    except KeyboardInterrupt:
+        pass

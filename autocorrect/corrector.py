@@ -122,6 +122,7 @@ class Corrector:
 
     @staticmethod
     def _score(hit, low: str) -> float:
+        # distance dominates, first-letter and length are tiebreakers, freq is a nudge
         s = -hit.distance * 20.0
         if hit.term[0] == low[0]:
             s += 15
