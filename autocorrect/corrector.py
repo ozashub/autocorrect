@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 from symspellpy import SymSpell, Verbosity
@@ -83,6 +84,10 @@ GRAMMAR = {
 
 WORD_BREAKS = set(";,.!?:")
 
+_PAT_STUTTER_2 = re.compile(r'(.{2})\1+')
+_PAT_STUTTER_3 = re.compile(r'(.{3})\1+')
+_PAT_CHAR_RUNS = re.compile(r'(.)\1+')
+
 
 class Corrector:
     MIN_FREQ = 1_000
@@ -155,6 +160,32 @@ class Corrector:
             return None
         return best.term
 
+    def _destutter(self, low: str) -> str | None:
+        if len(low) < 5:
+            return None
+        candidates = set()
+        for pat in (_PAT_STUTTER_2, _PAT_STUTTER_3):
+            collapsed = pat.sub(r'\1', low)
+            if collapsed != low:
+                candidates.add(collapsed)
+                # also squash leftover char runs: "auau" → "au" → then "uu" → "u"
+                deduped = _PAT_CHAR_RUNS.sub(r'\1', collapsed)
+                if deduped != collapsed:
+                    candidates.add(deduped)
+        deduped = _PAT_CHAR_RUNS.sub(r'\1', low)
+        if deduped != low:
+            candidates.add(deduped)
+
+        for c in candidates:
+            if len(c) >= 3 and c in self._known:
+                return c
+        for c in candidates:
+            if len(c) >= 3:
+                fix = self._try_correct(c)
+                if fix:
+                    return fix
+        return None
+
     def _lookup(self, word: str) -> str | None:
         low = word.lower()
 
@@ -171,11 +202,18 @@ class Corrector:
         if fix:
             return self._match_case(word, fix)
 
-        # key-mash salvage: user spazzed out mid-word, find the real word buried in the garbage
+        fix = self._destutter(low)
+        if fix:
+            return self._match_case(word, fix)
+
+        # prefix salvage: find the longest real word buried in key-mash garbage
         if len(low) >= 7:
             for i in range(len(low) - 3, 3, -1):
-                if low[:i] in self._known:
-                    return self._match_case(word, low[:i])
+                prefix = low[:i]
+                tail = low[i:]
+                # don't chop off real suffixes — "autocorrect" shouldn't become "auto"
+                if prefix in self._known and tail not in self._known:
+                    return self._match_case(word, prefix)
         return None
 
     def _commit(self, suffix: str):
